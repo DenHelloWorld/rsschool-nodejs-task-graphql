@@ -1,6 +1,11 @@
 import { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
-import { createGqlResponseSchema, gqlResponseSchema } from './schemas.js';
+import { gqlResponseSchema, QL_SCHEMA } from './schemas.js';
 import { graphql } from 'graphql';
+
+interface GraphQLRequestBody {
+  query: string;
+  variables?: Record<string, unknown>;
+}
 
 const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
   const { prisma } = fastify;
@@ -9,13 +14,28 @@ const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
     url: '/',
     method: 'POST',
     schema: {
-      ...createGqlResponseSchema,
       response: {
         200: gqlResponseSchema,
       },
     },
-    async handler(req) {
-      // return graphql();
+    async handler(req, reply) {
+      const body = req.body as GraphQLRequestBody;
+
+      if (!body.query) {
+        return reply.status(400).send({
+          data: null,
+          errors: [{ message: "The 'query' field is required." }],
+        });
+      }
+
+      const result = await graphql({
+        schema: QL_SCHEMA,
+        source: body.query,
+        variableValues: body.variables,
+        contextValue: { prisma },
+      });
+
+      return reply.send(result);
     },
   });
 };
