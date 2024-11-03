@@ -1,41 +1,44 @@
 import { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
-import { gqlResponseSchema, QL_SCHEMA } from './schemas.js';
-import { graphql } from 'graphql';
-
-interface GraphQLRequestBody {
-  query: string;
-  variables?: Record<string, unknown>;
-}
+import { createGqlResponseSchema, gqlResponseSchema } from './schemas.js';
+import { graphql, parse, validate, specifiedRules } from 'graphql';
+import depthLimit from 'graphql-depth-limit';
+import { GQL_SCHEMA } from './schemas.js';
+import handleGraphQLError from './helpers/handleGraphQLError.js';
+import setContext from './helpers/setContext.js';
 
 const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
-  const { prisma } = fastify;
-
   fastify.route({
     url: '/',
     method: 'POST',
     schema: {
+      ...createGqlResponseSchema,
       response: {
         200: gqlResponseSchema,
       },
     },
-    async handler(req, reply) {
-      const body = req.body as GraphQLRequestBody;
+    async handler(req) {
+      try {
+        const { query, variables } = req.body;
 
-      if (!body.query) {
-        return reply.status(400).send({
-          data: null,
-          errors: [{ message: "The 'query' field is required." }],
+        const document = parse(query);
+        const validationErrors = validate(GQL_SCHEMA, document, [
+          ...specifiedRules,
+          depthLimit(5),
+        ]);
+
+        if (validationErrors.length > 0) {
+          return { errors: validationErrors };
+        }
+
+        return await graphql({
+          schema: GQL_SCHEMA,
+          source: query,
+          variableValues: variables,
+          contextValue: setContext(req, fastify),
         });
+      } catch (error: unknown) {
+        return { errors: [handleGraphQLError(error)] };
       }
-
-      const result = await graphql({
-        schema: QL_SCHEMA,
-        source: body.query,
-        variableValues: body.variables,
-        contextValue: { prisma },
-      });
-
-      return reply.send(result);
     },
   });
 };
