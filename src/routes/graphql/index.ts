@@ -36,8 +36,8 @@ const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
           variableValues: variables,
           contextValue: setContext(req, fastify),
         });
-      } catch (error: unknown) {
-        return { errors: [handleGraphQLError(error)] };
+      } catch (e: unknown) {
+        return { errors: [handleGraphQLError(e)] };
       }
     },
   });

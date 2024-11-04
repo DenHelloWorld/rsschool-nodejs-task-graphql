@@ -1,18 +1,26 @@
 import { Type } from '@fastify/type-provider-typebox';
 
+export enum MemberTypeId {
+  BASIC = 'BASIC',
+  BUSINESS = 'BUSINESS',
+}
 
-export const gqlResponseSchema = Type.Partial(
-  Type.Object({
-    data: Type.Any(),
-    errors: Type.Any(),
+export const memberTypeFields = {
+  id: Type.String({
+    pattern: Object.values(MemberTypeId).join('|'),
   }),
-);
+  discount: Type.Number(),
+  postsLimitPerMonth: Type.Integer(),
+};
 
-export const createGqlResponseSchema = {
-  body: Type.Object(
+export const memberTypeSchema = Type.Object({
+  ...memberTypeFields,
+});
+
+export const getMemberTypeByIdSchema = {
+  params: Type.Object(
     {
-      query: Type.String(),
-      variables: Type.Optional(Type.Record(Type.String(), Type.Any())),
+      memberTypeId: memberTypeFields.id,
     },
     {
       additionalProperties: false,
